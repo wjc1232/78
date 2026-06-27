@@ -292,9 +292,9 @@ def selection_page():
                 with col1:
                     st.metric("采购成本", f"¥{product['cost']}")
                 with col2:
-                    st.metric("预计售价", f"€{product['price']}")
+                    st.metric("预计售价", f"€{product['price_eu']}")
                 with col3:
-                    st.metric("利润率", f"{product['profit_rate']}%")
+                    st.metric("利润率", f"{product['0']}%")
                 with col4:
                     st.metric("月销量预测", f"{product['sales_prediction']}件")
                 
