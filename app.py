@@ -282,10 +282,9 @@ def selection_page():
         
         # 推荐产品列表
         st.markdown("### 🏆 推荐产品TOP5")
-
-        if result['products']:
-            st.write("第一个产品的字段:", 
-        list(result['products'][0].keys()))
+    if result['products']:
+        st.write("第一个产品的字段:", list(result['products'][0].keys()))
+        
         for i, product in enumerate(result['products'], 1):
             with st.expander(f"**TOP{i}: {product['name']}** - 综合评分: {product['score']}分", expanded=(i==1)):
                 col1, col2, col3, col4 = st.columns(4)
