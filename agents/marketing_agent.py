@@ -201,7 +201,7 @@ Preis: €{price:.2f}"""
         elif language == "法语":
             title = f"{product_name} - Ventilateur Puissant avec Fonctionnement Silencieux, Économe en Énergie, Parfait pour la Maison et le Bureau"
             bullets = [
-                f"【Refroidissement Puissant】{core_features[0] if len(core_features) > 0 else 'Flux d\\'air puissant pour un refroidissement instantané'}",
+                f"【Refroidissement Puissant】{core_features[0] if len(core_features) > 0 else 'Flux d air puissant pour un refroidissement instantané'}",
                 f"【Ultra Silencieux】{core_features[1] if len(core_features) > 1 else 'Technologie de réduction du bruit pour un environnement paisible'}",
                 f"【Économe en Énergie】{core_features[2] if len(core_features) > 2 else 'Basse consommation électrique pour économiser sur votre facture'}",
                 f"【Design Portable】{core_features[3] if len(core_features) > 3 else 'Léger et facile à déplacer partout'}",
@@ -212,7 +212,7 @@ Preis: €{price:.2f}"""
 Parfait pour les journées d'été chaudes, ce ventilateur délivre un flux d'air puissant tout en fonctionnant en silence. Que vous travailliez, dormiez ou vous détendiez, il crée l'environnement confortable parfait pour vous.
 
 Caractéristiques Clés :
-• {core_features[0] if len(core_features) > 0 else 'Flux d\\'air puissant'}
+• {core_features[0] if len(core_features) > 0 else 'Flux d air puissant'}
 • {core_features[1] if len(core_features) > 1 else 'Fonctionnement ultra silencieux'}
 • {core_features[2] if len(core_features) > 2 else 'Design économe en énergie'}
 • {core_features[3] if len(core_features) > 3 else 'Portable et léger'}
