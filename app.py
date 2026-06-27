@@ -13,6 +13,7 @@ import plotly.express as px
 import json
 import os
 from datetime import datetime
+from agents import agents
 
 # 导入智能体模块
 from agents.selection_agent import SelectionAgent
