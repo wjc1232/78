@@ -13,7 +13,15 @@ import plotly.express as px
 import json
 import os
 from datetime import datetime
-from agents import agents
+import sys
+
+print("=== 调试信息 ===")
+print("当前目录:", os.getcwd())
+print("目录内容:", os.listdir("."))
+print("agents 是否存在:", os.path.isdir("agents"))
+if os.path.isdir("agents"):
+    print("agents 内部文件:", os.listdir("agents"))
+print("sys.path 前3项:", sys.path[:3])
 
 # 导入智能体模块
 from agents.selection_agent import SelectionAgent
