@@ -335,9 +335,9 @@ def to_pdf(result: dict, meta: dict) -> bytes:
 
 def _find_cjk_font():
     from matplotlib import font_manager
-    candidates = ['Microsoft YaHei', 'SimHei', 'PingFang SC', 'Hiragino Sans GB',
-                  'Heiti SC', 'Noto Sans CJK SC', 'Source Han Sans SC',
-                  'WenQuanYi Micro Hei', 'Arial Unicode MS', 'SimSun']
+    candidates = ['Noto Sans CJK SC','Microsoft YaHei', 'SimHei', 'PingFang SC', 
+                  'Hiragino Sans GB','Heiti SC', 'Noto Sans CJK SC', 
+                  'Source Han Sans SC','WenQuanYi Micro Hei', 'Arial Unicode MS', 'SimSun']
     available = {f.name for f in font_manager.fontManager.ttflist}
     for c in candidates:
         if c in available:
