@@ -53,43 +53,118 @@ def _display_width(s: str) -> int:
 
 # ==================== 1. Excel ====================
 
+def _risk_level(text: str) -> str:
+    """简易风险等级判断"""
+    t = str(text)
+    high_kw = ['认证', '合规', '罚款', '禁止', '侵权', '召回', '安全', '违规']
+    mid_kw = ['竞争', '价格', '物流', '关税', '退货', '库存', '汇率', '季节性']
+    for k in high_kw:
+        if k in t:
+            return '高'
+    for k in mid_kw:
+        if k in t:
+            return '中'
+    return '低'
+
+
 def to_excel(result: dict, meta: dict) -> bytes:
     from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
     from openpyxl.utils import get_column_letter
+    from openpyxl.chart import BarChart, LineChart, Reference
 
-    products_df = build_products_df(result)
-    trend_df = pd.DataFrame(result.get('trend_data', []) or [])
-    info_df = pd.DataFrame([{'项目': k, '内容': v} for k, v in meta.items()])
+    products = result.get('products', []) or []
+    trend = result.get('trend_data', []) or []
+
+    # ---------- 1) 报告概览 ----------
+    overview_rows = [{'项目': k, '内容': v} for k, v in meta.items()]
+    overview_rows.append({'项目': '推荐产品数量', '内容': len(products)})
+    if products:
+        scores = [p.get('score', 0) for p in products]
+        overview_rows.append({'项目': '平均综合评分', '内容': round(sum(scores) / len(scores), 1)})
+        best = max(products, key=lambda p: p.get('score', 0))
+        overview_rows.append({'项目': '最高评分产品', '内容': best.get('name', '')})
+        avg_profit = sum(profit_rate(p) for p in products) / len(products)
+        overview_rows.append({'项目': '平均利润率(%)', '内容': round(avg_profit, 1)})
+        total_sales = sum(p.get('sales_prediction', 0) for p in products)
+        overview_rows.append({'项目': '月销量预测合计(件)', '内容': total_sales})
+        total_gross = sum(
+            (p.get('price_eu', 0) * EUR_TO_CNY - p.get('cost', 0)) * p.get('sales_prediction', 0)
+            for p in products
+        )
+        overview_rows.append({'项目': '月毛利润预测合计(元)', '内容': round(total_gross, 1)})
+    overview_df = pd.DataFrame(overview_rows)
+
+    # ---------- 2) 推荐产品 ----------
+    prod_rows = []
+    for i, p in enumerate(products, 1):
+        pr = profit_rate(p)
+        revenue_cny = p.get('price_eu', 0) * EUR_TO_CNY
+        gross = revenue_cny - p.get('cost', 0)
+        prod_rows.append({
+            '排名': f'TOP{i}',
+            '产品名称': p.get('name', ''),
+            '综合评分': p.get('score', ''),
+            '采购成本(元)': p.get('cost', ''),
+            '预计售价(€)': p.get('price_eu', ''),
+            '预计售价(元)': round(revenue_cny, 1),
+            '单件毛利润(元)': round(gross, 1),
+            '利润率(%)': round(pr, 1),
+            '月销量预测(件)': p.get('sales_prediction', ''),
+            '月毛利润(元)': round(gross * p.get('sales_prediction', 0), 1),
+            '产品卖点': '；'.join(p.get('selling_points') or []),
+            '风险提示': '；'.join(p.get('risks') or []),
+        })
+    prod_df = pd.DataFrame(prod_rows)
+
+    # ---------- 3) 风险分析 ----------
+    risk_rows = []
+    for i, p in enumerate(products, 1):
+        for r in (p.get('risks') or []):
+            risk_rows.append({
+                '产品': f"TOP{i} {p.get('name', '')}",
+                '风险项': r,
+                '风险等级': _risk_level(r),
+            })
+    risk_df = pd.DataFrame(risk_rows) if risk_rows else pd.DataFrame(
+        {'提示': ['暂无风险项']})
+
+    # ---------- 4) 市场趋势 ----------
+    trend_df = pd.DataFrame(trend)
+    if not trend_df.empty and '销量' in trend_df.columns:
+        trend_df['环比增长率(%)'] = (
+            trend_df['销量'].pct_change().mul(100).round(1).fillna(0))
+
+    # ---------- 5) 选品建议 ----------
     sugg_df = pd.DataFrame({'选品建议': [result.get('suggestion', '')]})
 
+    # ---------- 写入 Excel ----------
     buf = io.BytesIO()
     with pd.ExcelWriter(buf, engine='openpyxl') as writer:
-        info_df.to_excel(writer, sheet_name='报告信息', index=False)
-        products_df.to_excel(writer, sheet_name='推荐产品', index=False)
+        overview_df.to_excel(writer, sheet_name='报告概览', index=False)
+        prod_df.to_excel(writer, sheet_name='推荐产品', index=False)
+        risk_df.to_excel(writer, sheet_name='风险分析', index=False)
         if not trend_df.empty:
             trend_df.to_excel(writer, sheet_name='市场趋势', index=False)
         sugg_df.to_excel(writer, sheet_name='选品建议', index=False)
 
+        wb = writer.book
+
+        # 通用样式
         header_fill = PatternFill('solid', fgColor='667EEA')
         header_font = Font(color='FFFFFF', bold=True, size=11)
         thin = Side(style='thin', color='D0D0D0')
         border = Border(left=thin, right=thin, top=thin, bottom=thin)
 
-        for ws in writer.book.worksheets:
-            # 表头样式
+        for ws in wb.worksheets:
             for cell in ws[1]:
                 cell.fill = header_fill
                 cell.font = header_font
                 cell.alignment = Alignment(horizontal='center', vertical='center')
-
-            # 边框 + 换行
             for row in ws.iter_rows():
                 for cell in row:
                     cell.border = border
                     if cell.row > 1:
                         cell.alignment = Alignment(vertical='center', wrap_text=True)
-
-            # 自动列宽
             for col_idx in range(1, ws.max_column + 1):
                 max_w = 10
                 for row_idx in range(1, ws.max_row + 1):
@@ -97,10 +172,50 @@ def to_excel(result: dict, meta: dict) -> bytes:
                     if v is not None:
                         max_w = max(max_w, _display_width(v))
                 ws.column_dimensions[get_column_letter(col_idx)].width = min(max_w + 4, 60)
-
-            # 行高 & 冻结首行
-            ws.row_dimensions[1].height = 22
+            ws.row_dimensions[1].height = 24
             ws.freeze_panes = 'A2'
+
+        # ---------- 「推荐产品」Sheet 内嵌图表 ----------
+        ws = wb['推荐产品']
+        n = len(prod_df)
+        if n > 0:
+            cats = Reference(ws, min_col=2, min_row=2, max_row=n + 1)
+
+            chart1 = BarChart()
+            chart1.type = 'bar'
+            chart1.title = '产品综合评分'
+            chart1.height = 8
+            chart1.width = 16
+            data1 = Reference(ws, min_col=3, min_row=1, max_row=n + 1)  # 综合评分列
+            chart1.add_data(data1, titles_from_data=True)
+            chart1.set_categories(cats)
+            ws.add_chart(chart1, f"A{n + 4}")
+
+            chart2 = BarChart()
+            chart2.type = 'col'
+            chart2.title = '各产品利润率(%)'
+            chart2.height = 8
+            chart2.width = 16
+            data2 = Reference(ws, min_col=8, min_row=1, max_row=n + 1)  # 利润率列
+            chart2.add_data(data2, titles_from_data=True)
+            chart2.set_categories(cats)
+            ws.add_chart(chart2, f"A{n + 22}")
+
+        # ---------- 「市场趋势」Sheet 内嵌折线图 ----------
+        if not trend_df.empty and '销量' in trend_df.columns:
+            ws2 = wb['市场趋势']
+            n2 = len(trend_df)
+            line = LineChart()
+            line.title = '销量趋势'
+            line.y_axis.title = '销量'
+            line.x_axis.title = '月份'
+            line.height = 9
+            line.width = 20
+            data = Reference(ws2, min_col=2, min_row=1, max_row=n2 + 1)
+            cats2 = Reference(ws2, min_col=1, min_row=2, max_row=n2 + 1)
+            line.add_data(data, titles_from_data=True)
+            line.set_categories(cats2)
+            ws2.add_chart(line, f"A{n2 + 4}")
 
     buf.seek(0)
     return buf.getvalue()
@@ -349,29 +464,36 @@ def to_png(result: dict, meta: dict) -> bytes:
     import matplotlib
     matplotlib.use('Agg')
     import matplotlib.pyplot as plt
+    from matplotlib.patches import FancyBboxPatch
 
-    font = _find_cjk_font()
-    if font:
-        plt.rcParams['font.sans-serif'] = [font]
+    font_name = _ensure_cjk_font()
+    if font_name:
+        plt.rcParams['font.sans-serif'] = [font_name]
         plt.rcParams['font.family'] = 'sans-serif'
+    else:
+        plt.rcParams['font.sans-serif'] = ['DejaVu Sans']
     plt.rcParams['axes.unicode_minus'] = False
 
     products = result.get('products', []) or []
     trend = result.get('trend_data', []) or []
 
-    fig = plt.figure(figsize=(11, 14.5), dpi=140)
+    # 图更矮更紧凑
+    fig = plt.figure(figsize=(11, 10.5), dpi=140)
     fig.patch.set_facecolor('white')
 
-    # ---- 标题 ----
-    fig.text(0.05, 0.978, '凉贸通 · 选品分析报告', fontsize=21, fontweight='bold',
+    # ---- 标题区 ----
+    fig.text(0.04, 0.975, '凉贸通 · 选品分析报告',
+             fontsize=20, fontweight='bold',
              color='#4B4B8F', ha='left', va='top')
-    fig.text(0.05, 0.947, '　|　'.join(f'{k}：{v}' for k, v in meta.items()),
-             fontsize=9.5, color='#888888', ha='left', va='top')
-    fig.add_artist(plt.Line2D([0.05, 0.95], [0.933, 0.933], color='#667EEA', lw=2.5,
+    fig.text(0.04, 0.947,
+             '　|　'.join(f'{k}：{v}' for k, v in meta.items()),
+             fontsize=9, color='#888888', ha='left', va='top')
+    fig.add_artist(plt.Line2D([0.04, 0.96], [0.930, 0.930],
+                              color='#667EEA', lw=2.5,
                               transform=fig.transFigure))
 
     # ---- 左：评分条形图 ----
-    ax1 = fig.add_axes([0.06, 0.675, 0.40, 0.235])
+    ax1 = fig.add_axes([0.05, 0.680, 0.42, 0.235])
     if products:
         names = [p.get('name', '') for p in products][::-1]
         scores = [p.get('score', 0) for p in products][::-1]
@@ -385,10 +507,11 @@ def to_png(result: dict, meta: dict) -> bytes:
             ax1.spines[sp].set_visible(False)
         ax1.grid(axis='x', linestyle='--', alpha=0.3)
         ax1.set_axisbelow(True)
-    ax1.set_title('产品综合评分', fontsize=12, fontweight='bold', color='#333333', pad=10)
+    ax1.set_title('产品综合评分', fontsize=12, fontweight='bold',
+                  color='#333333', pad=6)
 
-    # ---- 右：趋势折线图 ----
-    ax2 = fig.add_axes([0.56, 0.675, 0.39, 0.235])
+    # ---- 右：销量趋势 ----
+    ax2 = fig.add_axes([0.55, 0.680, 0.42, 0.235])
     if trend:
         xs = [str(d.get('月份', '')) for d in trend]
         ys = [d.get('销量', 0) for d in trend]
@@ -401,10 +524,11 @@ def to_png(result: dict, meta: dict) -> bytes:
         ax2.set_axisbelow(True)
         for sp in ['top', 'right']:
             ax2.spines[sp].set_visible(False)
-    ax2.set_title('目标市场销量趋势', fontsize=12, fontweight='bold', color='#333333', pad=10)
+    ax2.set_title('目标市场销量趋势', fontsize=12, fontweight='bold',
+                  color='#333333', pad=6)
 
-    # ---- 产品表格 ----
-    ax3 = fig.add_axes([0.03, 0.30, 0.94, 0.34])
+    # ---- 中间：表格 ----
+    ax3 = fig.add_axes([0.02, 0.315, 0.96, 0.31])
     ax3.axis('off')
     if products:
         cols = ['排名', '产品名称', '评分', '成本(元)', '售价(€)', '利润率', '月销量']
@@ -416,34 +540,46 @@ def to_png(result: dict, meta: dict) -> bytes:
                 f'{profit_rate(p):.1f}%', str(p.get('sales_prediction', '')),
             ])
         tbl = ax3.table(cellText=cell_text, colLabels=cols,
-                        loc='center', cellLoc='center',
+                        loc='upper center', cellLoc='center',
                         colWidths=[0.09, 0.30, 0.09, 0.13, 0.12, 0.11, 0.16])
         tbl.auto_set_font_size(False)
         tbl.set_fontsize(9.5)
-        tbl.scale(1, 2.0)
+        # 产品少时行高更大，避免顶部空；产品多时压缩
+        row_scale = 2.2 if len(products) <= 4 else (1.8 if len(products) <= 6 else 1.4)
+        tbl.scale(1, row_scale)
         for j in range(len(cols)):
             tbl[0, j].set_facecolor('#667EEA')
             tbl[0, j].set_text_props(color='white', fontweight='bold')
+            tbl[0, j].set_height(0.11)
         for i in range(1, len(cell_text) + 1):
             for j in range(len(cols)):
                 if i % 2 == 0:
                     tbl[i, j].set_facecolor('#F2F4FB')
                 tbl[i, j].set_edgecolor('#D8DCEA')
-    ax3.set_title('推荐产品一览', fontsize=12, fontweight='bold',
-                  color='#333333', pad=18)
+        ax3.text(0.5, 1.03, '推荐产品一览', fontsize=12, fontweight='bold',
+                 color='#333333', ha='center', va='bottom',
+                 transform=ax3.transAxes)
 
-    # ---- 选品建议 ----
-    ax4 = fig.add_axes([0.05, 0.03, 0.90, 0.24])
+    # ---- 底部：选品建议（带背景框，视觉更饱满）----
+    ax4 = fig.add_axes([0.04, 0.045, 0.92, 0.21])
     ax4.axis('off')
-    ax4.text(0, 1.0, '选品建议', fontsize=12, fontweight='bold',
-             color='#4B4B8F', va='top')
-    sugg = result.get('suggestion', '') or ''
-    wrapped = '\n'.join(textwrap.wrap(sugg, width=58)) or '（无）'
-    ax4.text(0, 0.80, wrapped, fontsize=10.5, va='top',
-             linespacing=1.9, color='#333333')
+    bg = FancyBboxPatch(
+        (0.005, 0.02), 0.99, 0.96,
+        boxstyle="round,pad=0.005,rounding_size=0.03",
+        linewidth=1, edgecolor='#C5CEE9', facecolor='#F4F6FC',
+        transform=ax4.transAxes, clip_on=False,
+    )
+    ax4.add_patch(bg)
+    ax4.text(0.025, 0.90, '💡 选品建议', fontsize=13, fontweight='bold',
+             color='#4B4B8F', va='top', transform=ax4.transAxes)
+    sugg = (result.get('suggestion', '') or '（无）').strip()
+    wrapped = '\n'.join(textwrap.wrap(sugg, width=55)) or '（无）'
+    ax4.text(0.025, 0.70, wrapped, fontsize=11, va='top',
+             linespacing=1.9, color='#333333', transform=ax4.transAxes)
 
     buf = io.BytesIO()
-    fig.savefig(buf, format='png', facecolor='white', bbox_inches='tight')
+    fig.savefig(buf, format='png', facecolor='white',
+                bbox_inches='tight', pad_inches=0.15)
     plt.close(fig)
     buf.seek(0)
     return buf.getvalue()
