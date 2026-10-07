@@ -448,15 +448,40 @@ def to_pdf(result: dict, meta: dict) -> bytes:
 
 # ==================== 4. PNG 图片 ====================
 
-def _find_cjk_font():
+def _ensure_cjk_font():
+    """
+    返回一个可用的中文字体名；找不到返回 None。
+    服务器已通过 packages.txt 安装 fonts-noto-cjk，
+    因此这里主要就是把它找出来。
+    """
     from matplotlib import font_manager
-    candidates = ['Noto Sans CJK SC','Microsoft YaHei', 'SimHei', 'PingFang SC', 
-                  'Hiragino Sans GB','Heiti SC', 'Noto Sans CJK SC', 
-                  'Source Han Sans SC','WenQuanYi Micro Hei', 'Arial Unicode MS', 'SimSun']
+
+    # 优先：Noto CJK（云端已装）
+    candidates = [
+        'Noto Sans CJK SC', 'Noto Sans CJK JP',
+        'Noto Sans CJK TC', 'Noto Serif CJK SC',
+        # 本地常见
+        'Microsoft YaHei', 'SimHei', 'SimSun',
+        'PingFang SC', 'Hiragino Sans GB', 'Heiti SC',
+        'Source Han Sans SC', 'WenQuanYi Micro Hei',
+        'Arial Unicode MS',
+    ]
+
     available = {f.name for f in font_manager.fontManager.ttflist}
-    for c in candidates:
-        if c in available:
-            return c
+    for name in candidates:
+        if name in available:
+            return name
+
+    # 兜底：在系统字体目录里直接扫一遍 Noto CJK
+    import glob
+    for path in glob.glob('/usr/share/fonts/**/*CJK*.ttc', recursive=True) + \
+                glob.glob('/usr/share/fonts/**/*CJK*.otf', recursive=True):
+        try:
+            font_manager.fontManager.addfont(path)
+            return font_manager.FontProperties(fname=path).get_name()
+        except Exception:
+            continue
+
     return None
 
 
