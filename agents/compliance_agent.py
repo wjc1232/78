@@ -119,7 +119,51 @@ class ComplianceAgent(BaseAgent):
             "product_name": product_name,
             "target_country": target_country
         }
-    
+    def list_certifications(self, category: str, has_battery: bool) -> List[Dict]:
+        """
+        列出当前产品类别下所有可勾选的认证项。
+        前端用它动态生成 checkbox，避免"agent 检查了但用户勾不到"的情况。
+        """
+        standards = self.compliance_standards.get(
+            category, self.compliance_standards["电子产品"]
+        )
+
+        options = []
+        seen = set()
+
+        for standard in standards:
+            # 电池指令只在含电池时展示
+            if standard['name'] == "电池指令" and not has_battery:
+                continue
+
+            key = (standard['name']
+                   .split('认证')[0]
+                   .split('指令')[0]
+                   .split('法规')[0])
+
+            if key in seen:
+                continue
+            seen.add(key)
+
+            options.append({
+                "key": key,
+                "name": standard['name'],
+                "required": standard['required'],
+                "level": standard['level'],
+                "description": standard['description'],
+            })
+
+        # 含电池但标准表里没写"电池指令"时补一项
+        if has_battery and "电池" not in seen:
+            options.append({
+                "key": "电池",
+                "name": "电池指令",
+                "required": True,
+                "level": "高",
+                "description": "电池环保要求（含电池产品）",
+            })
+
+        return options
     def _match_hs_code(self, category: str, user_hs_code: str) -> str:
         """匹配HS编码"""
         if user_hs_code:
