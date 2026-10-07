@@ -7,6 +7,8 @@ Streamlit 轻量化演示网页主程序
 日期：2026年6月
 """
 
+from datetime import datetime
+from zoneinfo import ZoneInfo   # Python 3.9+ 自带
 import streamlit as st
 import pandas as pd
 import plotly.express as px
@@ -31,6 +33,10 @@ st.set_page_config(
 )
 
 # ==================== 样式定制 ====================
+def now_cn():
+    """返回北京时间（UTC+8）"""
+    return datetime.now(ZoneInfo("Asia/Shanghai"))
+
 def custom_css():
     """自定义CSS样式"""
     st.markdown("""
@@ -813,7 +819,7 @@ def main():
         st.markdown("---")
         st.markdown("### 📊 系统状态")
         st.info("✅ 所有智能体运行正常")
-        st.info(f"🕐 当前时间：{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+        st.info(f"🕐 当前时间：{now_cn().strftime('%Y-%m-%d %H:%M:%S')}")
     
     # 页面路由
     if page == "🏠 首页":
