@@ -608,7 +608,7 @@ def export_selection_report(result: dict, meta: dict, fmt: str = 'Excel',
                             name_hint: str = ''):
     """返回 (bytes, 文件名, MIME 类型)"""
     base = (f"选品分析报告_{safe_filename(name_hint)}_"
-            f"{datetime.now():%Y%m%d}")
+            f"{_now_cn():%Y%m%d}")
 
     if fmt == 'Excel':
         data = to_excel(result, meta)
