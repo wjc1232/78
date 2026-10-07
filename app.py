@@ -557,33 +557,78 @@ def compliance_page():
     """合规校验页面"""
     st.markdown("## ✅ 跨境合规校验智能体")
     st.write("自动检查欧盟合规标准，计算进口税费，帮助您规避合规风险")
-    
-    # 产品信息
+
+    # ---------- 产品信息 ----------
     st.markdown("### 📝 产品信息")
-    
+
     col1, col2 = st.columns(2)
-    
+
     with col1:
         product_name = st.text_input("产品名称", value="USB充电小风扇")
-        product_category = st.selectbox("产品类别", ["电子产品", "家用电器", "纺织用品", "塑料制品"])
+        product_category = st.selectbox(
+            "产品类别",
+            ["电子产品", "家用电器", "纺织用品", "塑料制品"]
+        )
         material = st.text_input("主要材质", value="ABS塑料 + 电子元件")
         has_battery = st.checkbox("含电池", value=True)
-    
+
     with col2:
-        target_country = st.selectbox("目标国家", ["德国", "法国", "意大利", "西班牙", "荷兰"])
-        declared_value = st.number_input("申报价值(USD)", value=1500.00, step=100.0)
+        target_country = st.selectbox(
+            "目标国家", ["德国", "法国", "意大利", "西班牙", "荷兰"]
+        )
+        declared_value = st.number_input(
+            "申报价值(USD)", value=1500.00, step=100.0
+        )
         hs_code = st.text_input("HS编码（选填，系统可自动匹配）", value="")
-        
-        st.markdown("**认证情况：**")
-        ce_cert = st.checkbox("CE认证", value=True)
-        rohs_cert = st.checkbox("ROHS认证", value=False)
-        reach_cert = st.checkbox("REACH认证", value=False)
-    
-    # 校验按钮
+
+    # ---------- 认证情况（动态生成） ----------
+    st.markdown("### 🏅 认证情况")
+    st.caption(
+        "根据所选「产品类别」和「是否含电池」，系统自动列出相关合规认证。"
+        "**勾选表示你已具备该认证**，未勾选会被 agent 标记为风险项。"
+    )
+
+    agents = init_agents()
+    cert_options = agents['compliance'].list_certifications(
+        product_category, has_battery
+    )
+
+    certifications = {}
+    if cert_options:
+        # 每行 3 个 checkbox
+        cert_cols = st.columns(3)
+        for i, opt in enumerate(cert_options):
+            with cert_cols[i % 3]:
+                label = opt['name']
+                if opt['required']:
+                    label += "（强制）"
+                else:
+                    label += "（建议）"
+                certifications[opt['key']] = st.checkbox(
+                    label,
+                    value=False,
+                    key=f"cert_{opt['key']}",
+                    help=opt['description'],
+                )
+    else:
+        st.info("当前产品类别下没有适用的认证项。")
+
+    # 快捷按钮：一键全选 / 一键清空
+    qc1, qc2, _ = st.columns([1, 1, 3])
+    with qc1:
+        if st.button("✅ 一键全选", use_container_width=True):
+            for opt in cert_options:
+                st.session_state[f"cert_{opt['key']}"] = True
+            st.rerun()
+    with qc2:
+        if st.button("🧹 一键清空", use_container_width=True):
+            for opt in cert_options:
+                st.session_state[f"cert_{opt['key']}"] = False
+            st.rerun()
+
+    # ---------- 校验按钮 ----------
     if st.button("🔍 开始合规校验", type="primary", use_container_width=True):
         with st.spinner("智能体正在进行合规校验..."):
-            # 调用合规智能体
-            agents = init_agents()
             result = agents['compliance'].check(
                 product_name=product_name,
                 product_category=product_category,
@@ -592,53 +637,57 @@ def compliance_page():
                 target_country=target_country,
                 declared_value=declared_value,
                 hs_code=hs_code,
-                certifications={
-                    'CE': ce_cert,
-                    'ROHS': rohs_cert,
-                    'REACH': reach_cert
-                }
+                certifications=certifications,
             )
-        
-        # 展示结果
+
         st.success("✅ 合规校验完成！")
-        
-        # 合规评分
+
+        # ---------- 评分 ----------
         st.markdown("### 📊 合规评分")
-        col1, col2, col3 = st.columns(3)
-        
-        with col1:
+        c1, c2, c3 = st.columns(3)
+        with c1:
             st.metric("综合合规评分", f"{result['score']}/100分")
-        with col2:
+        with c2:
             st.metric("高风险项", f"{result['high_risk_count']}项")
-        with col3:
+        with c3:
             st.metric("建议HS编码", result['hs_code_suggestion'])
-        
-        # 风险列表
+
+        # ---------- 风险列表 ----------
         st.markdown("### ⚠️ 风险项列表")
-        
-        for risk in result['risks']:
-            if risk['level'] == '高':
-                st.error(f"🔴 【高风险】{risk['name']}：{risk['description']}")
-                st.info(f"💡 整改建议：{risk['suggestion']}")
-            elif risk['level'] == '中':
-                st.warning(f"🟡 【中风险】{risk['name']}：{risk['description']}")
-                st.info(f"💡 整改建议：{risk['suggestion']}")
-            else:
-                st.info(f"🟢 【低风险】{risk['name']}：{risk['description']}")
-        
-        # 税费计算
+
+        if not result['risks']:
+            st.success("🎉 未发现风险项，所有适用认证已具备。")
+        else:
+            for risk in result['risks']:
+                if risk['level'] == '高':
+                    st.error(f"🔴 【高风险】{risk['name']}：{risk['description']}")
+                    st.info(f"💡 整改建议：{risk['suggestion']}")
+                elif risk['level'] == '中':
+                    st.warning(f"🟡 【中风险】{risk['name']}：{risk['description']}")
+                    st.info(f"💡 整改建议：{risk['suggestion']}")
+                else:
+                    st.info(f"🟢 【低风险 / 建议】{risk['name']}：{risk['description']}")
+
+        # ---------- 税费明细 ----------
         st.markdown("### 💰 税费计算明细")
-        
+
         tax_df = pd.DataFrame([
-            {"税费项目": "进口关税", "税率": f"{result['tax']['duty_rate']}%", "金额(USD)": result['tax']['duty_amount']},
-            {"税费项目": "VAT增值税", "税率": f"{result['tax']['vat_rate']}%", "金额(USD)": result['tax']['vat_amount']},
-            {"税费项目": "其他费用", "税率": "-", "金额(USD)": result['tax']['other_fees']},
-            {"税费项目": "**合计**", "税率": "-", "金额(USD)": f"**{result['tax']['total']}**"},
+            {"税费项目": "进口关税",
+             "税率": f"{result['tax']['duty_rate']}%",
+             "金额(USD)": result['tax']['duty_amount']},
+            {"税费项目": "VAT增值税",
+             "税率": f"{result['tax']['vat_rate']}%",
+             "金额(USD)": result['tax']['vat_amount']},
+            {"税费项目": "其他费用",
+             "税率": "-",
+             "金额(USD)": result['tax']['other_fees']},
+            {"税费项目": "**合计**",
+             "税率": "-",
+             "金额(USD)": f"**{result['tax']['total']}**"},
         ])
-        
         st.table(tax_df)
-        
-        # 整改建议
+
+        # ---------- 整改建议 ----------
         st.markdown("### 📋 整改建议汇总")
         st.markdown(f"""
         <div class="result-box">
