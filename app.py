@@ -803,22 +803,28 @@ def main():
     """主函数"""
     custom_css()
     
-    # 侧边栏导航
+        # ---------- 侧边栏 ----------
     with st.sidebar:
         st.markdown("## ❄️ 凉贸通")
         st.markdown("义乌降温品类欧洲出海OPC智能体")
         st.markdown("---")
-        
+
         page = st.radio(
             "功能导航",
             ["🏠 首页", "📊 选品分析", "📄 单证处理", "🌍 多语种营销", "✅ 合规校验", "🎨 智能展示"],
             index=0
         )
-        
+
         st.markdown("---")
         st.markdown("### 📊 系统状态")
         st.info("✅ 所有智能体运行正常")
-        st.info(f"🕐 当前时间：{now_cn().strftime('%Y-%m-%d %H:%M:%S')}")
+
+        # 每秒自动刷新的时间块
+        @st.fragment(run_every="1s")
+        def _live_clock():
+            st.info(f"🕐 北京时间：{now_cn().strftime('%Y-%m-%d %H:%M:%S')}")
+
+        _live_clock()
     
     # 页面路由
     if page == "🏠 首页":
