@@ -622,3 +622,378 @@ def export_selection_report(result: dict, meta: dict, fmt: str = 'Excel',
         raise ValueError(f'不支持的导出格式：{fmt}')
 
     return data, base + EXT[fmt], MIME[fmt]
+# ==================== 5. 智能展示 · 导出 ====================
+
+def _display_overview_df(result: dict, meta: dict) -> pd.DataFrame:
+    rows = [{'项目': k, '内容': v} for k, v in meta.items()]
+    rec = result.get('recommendation', {}) or {}
+    rows.append({'项目': '推荐方案', '内容': rec.get('scheme', '')})
+    rows.append({'项目': '推荐理由', '内容': rec.get('reason', '')})
+    rows.append({'项目': '方案数量', '内容': len(result.get('schemes', []) or [])})
+    return pd.DataFrame(rows)
+
+
+def _display_schemes_df(result: dict) -> pd.DataFrame:
+    rows = []
+    for i, s in enumerate(result.get('schemes', []) or [], 1):
+        rows.append({
+            '方案': f'方案{i}',
+            '方案名称': s.get('name', ''),
+            '方案特点': s.get('description', ''),
+            '适合场景': s.get('suitable_for', ''),
+            '预计转化率提升': s.get('conversion_boost', ''),
+            '页面结构': ' → '.join(s.get('structure') or []),
+            '文案示例': s.get('sample_copy', ''),
+        })
+    return pd.DataFrame(rows)
+
+
+def to_excel_display(result: dict, meta: dict) -> bytes:
+    from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
+    from openpyxl.utils import get_column_letter
+
+    overview_df = _display_overview_df(result, meta)
+    schemes_df = _display_schemes_df(result)
+
+    buf = io.BytesIO()
+    with pd.ExcelWriter(buf, engine='openpyxl') as writer:
+        overview_df.to_excel(writer, sheet_name='方案概览', index=False)
+        schemes_df.to_excel(writer, sheet_name='方案对比', index=False)
+
+        # 每个方案单独一个 Sheet
+        for i, s in enumerate(result.get('schemes', []) or [], 1):
+            name = s.get('name', f'方案{i}')
+            detail_rows = [
+                {'项目': '方案名称', '内容': name},
+                {'项目': '方案特点', '内容': s.get('description', '')},
+                {'项目': '适合场景', '内容': s.get('suitable_for', '')},
+                {'项目': '预计转化率提升', '内容': s.get('conversion_boost', '')},
+                {'项目': '页面结构', '内容': ''},
+            ]
+            for j, sec in enumerate(s.get('structure') or [], 1):
+                detail_rows.append({'项目': f'  第{j}段', '内容': sec})
+            detail_rows.append({'项目': '文案示例', '内容': s.get('sample_copy', '')})
+
+            pd.DataFrame(detail_rows).to_excel(
+                writer, sheet_name=f'方案{i}', index=False
+            )
+
+        wb = writer.book
+        header_fill = PatternFill('solid', fgColor='667EEA')
+        header_font = Font(color='FFFFFF', bold=True, size=11)
+        thin = Side(style='thin', color='D0D0D0')
+        border = Border(left=thin, right=thin, top=thin, bottom=thin)
+
+        for ws in wb.worksheets:
+            for cell in ws[1]:
+                cell.fill = header_fill
+                cell.font = header_font
+                cell.alignment = Alignment(horizontal='center', vertical='center')
+            for row in ws.iter_rows():
+                for cell in row:
+                    cell.border = border
+                    if cell.row > 1:
+                        cell.alignment = Alignment(vertical='center', wrap_text=True)
+            for col_idx in range(1, ws.max_column + 1):
+                max_w = 10
+                for row_idx in range(1, ws.max_row + 1):
+                    v = ws.cell(row=row_idx, column=col_idx).value
+                    if v is not None:
+                        max_w = max(max_w, _display_width(v))
+                ws.column_dimensions[get_column_letter(col_idx)].width = min(max_w + 4, 60)
+            ws.row_dimensions[1].height = 24
+            ws.freeze_panes = 'A2'
+
+    buf.seek(0)
+    return buf.getvalue()
+
+
+def to_word_display(result: dict, meta: dict) -> bytes:
+    from docx import Document
+    from docx.shared import Pt, RGBColor
+    from docx.enum.text import WD_ALIGN_PARAGRAPH
+    from docx.oxml.ns import qn
+
+    CN = '微软雅黑'
+
+    def style_run(run, size=10.5, bold=None, color=None):
+        run.font.name = CN
+        rpr = run._element.get_or_add_rPr()
+        rfonts = rpr.get_or_add_rFonts()
+        rfonts.set(qn('w:eastAsia'), CN)
+        rfonts.set(qn('w:ascii'), CN)
+        rfonts.set(qn('w:hAnsi'), CN)
+        run.font.size = Pt(size)
+        if bold is not None:
+            run.font.bold = bold
+        if color:
+            run.font.color.rgb = RGBColor(*color)
+
+    doc = Document()
+    normal = doc.styles['Normal']
+    normal.font.name = CN
+    normal.font.size = Pt(10.5)
+    normal.element.get_or_add_rPr().get_or_add_rFonts().set(qn('w:eastAsia'), CN)
+
+    h = doc.add_heading(level=0)
+    h.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    style_run(h.add_run('凉贸通 · 商品详情页方案'), size=22, bold=True, color=(0x4B, 0x4B, 0x8F))
+
+    p = doc.add_paragraph()
+    p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    style_run(p.add_run('　|　'.join(f'{k}：{v}' for k, v in meta.items())),
+              size=9, color=(0x88, 0x88, 0x88))
+
+    # 推荐方案
+    rec = result.get('recommendation', {}) or {}
+    h1 = doc.add_heading(level=1)
+    style_run(h1.add_run('一、智能推荐方案'), size=14, bold=True, color=(0x4B, 0x4B, 0x8F))
+    pr = doc.add_paragraph()
+    style_run(pr.add_run(f"推荐方案：{rec.get('scheme', '')}"), size=11, bold=True)
+    pr2 = doc.add_paragraph()
+    style_run(pr2.add_run(rec.get('reason', '')), size=10.5)
+
+    # 方案详情
+    h1 = doc.add_heading(level=1)
+    style_run(h1.add_run('二、方案详情'), size=14, bold=True, color=(0x4B, 0x4B, 0x8F))
+
+    for i, s in enumerate(result.get('schemes', []) or [], 1):
+        h2 = doc.add_heading(level=2)
+        style_run(h2.add_run(
+            f"方案{i}：{s.get('name', '')}（预计转化率提升 {s.get('conversion_boost', '-')}）"),
+            size=12, bold=True, color=(0x33, 0x33, 0x33))
+
+        for label, key in [('方案特点', 'description'), ('适合场景', 'suitable_for')]:
+            p_ = doc.add_paragraph()
+            style_run(p_.add_run(f'{label}：'), size=10, bold=True)
+            style_run(p_.add_run(str(s.get(key, ''))), size=10)
+
+        p_ = doc.add_paragraph()
+        style_run(p_.add_run('页面结构：'), size=10, bold=True)
+        for j, sec in enumerate(s.get('structure') or [], 1):
+            bp = doc.add_paragraph(style='List Number')
+            style_run(bp.add_run(str(sec)), size=10)
+
+        p_ = doc.add_paragraph()
+        style_run(p_.add_run('文案示例：'), size=10, bold=True)
+        bp = doc.add_paragraph()
+        style_run(bp.add_run(str(s.get('sample_copy', ''))), size=9.5,
+                  color=(0x55, 0x55, 0x55))
+
+    # 页脚
+    fp = doc.add_paragraph()
+    fp.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    style_run(fp.add_run(f"凉贸通 © 2026　|　生成时间：{_now_cn():%Y-%m-%d %H:%M}"),
+              size=8, color=(0xAA, 0xAA, 0xAA))
+
+    buf = io.BytesIO()
+    doc.save(buf)
+    buf.seek(0)
+    return buf.getvalue()
+
+
+def to_pdf_display(result: dict, meta: dict) -> bytes:
+    from reportlab.lib.pagesizes import A4
+    from reportlab.lib import colors
+    from reportlab.lib.units import mm
+    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+    from reportlab.pdfbase import pdfmetrics
+    from reportlab.pdfbase.cidfonts import UnicodeCIDFont
+    from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
+
+    pdfmetrics.registerFont(UnicodeCIDFont('STSong-Light'))
+    F = 'STSong-Light'
+
+    base = getSampleStyleSheet()
+    title_s = ParagraphStyle('t', parent=base['Title'], fontName=F, fontSize=20,
+                             leading=26, textColor=colors.HexColor('#4B4B8F'))
+    h1_s = ParagraphStyle('h1', parent=base['Heading1'], fontName=F, fontSize=13,
+                          leading=18, spaceBefore=14, spaceAfter=6,
+                          textColor=colors.HexColor('#4B4B8F'))
+    h2_s = ParagraphStyle('h2', parent=base['Heading2'], fontName=F, fontSize=11,
+                          leading=16, spaceBefore=10, spaceAfter=4,
+                          textColor=colors.HexColor('#333333'))
+    body_s = ParagraphStyle('b', parent=base['BodyText'], fontName=F, fontSize=9.5,
+                            leading=15, textColor=colors.HexColor('#333333'))
+    meta_s = ParagraphStyle('m', parent=body_s, fontSize=8.5,
+                            textColor=colors.HexColor('#888888'))
+
+    buf = io.BytesIO()
+    doc = SimpleDocTemplate(buf, pagesize=A4,
+                            leftMargin=18 * mm, rightMargin=18 * mm,
+                            topMargin=16 * mm, bottomMargin=16 * mm,
+                            title='凉贸通商品详情页方案')
+    story = []
+
+    story.append(Paragraph('凉贸通 · 商品详情页方案', title_s))
+    story.append(Spacer(1, 4))
+    story.append(Paragraph('　|　'.join(f'{k}：{v}' for k, v in meta.items()), meta_s))
+    story.append(Spacer(1, 10))
+
+    # 推荐方案
+    rec = result.get('recommendation', {}) or {}
+    story.append(Paragraph('一、智能推荐方案', h1_s))
+    story.append(Paragraph(
+        f"<b>推荐：{rec.get('scheme', '')}</b>", body_s))
+    story.append(Paragraph(rec.get('reason', '').replace('\n', '<br/>'), body_s))
+
+    # 方案表
+    story.append(Paragraph('二、方案对比', h1_s))
+    head = ['方案', '名称', '适合场景', '转化率提升']
+    data = [[Paragraph(f'<font color="#FFFFFF"><b>{c}</b></font>', body_s) for c in head]]
+    for i, s in enumerate(result.get('schemes', []) or [], 1):
+        data.append([
+            Paragraph(f'方案{i}', body_s),
+            Paragraph(str(s.get('name', '')), body_s),
+            Paragraph(str(s.get('suitable_for', '')), body_s),
+            Paragraph(str(s.get('conversion_boost', '')), body_s),
+        ])
+    t = Table(data, colWidths=[20 * mm, 40 * mm, 70 * mm, 30 * mm], repeatRows=1)
+    t.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#667EEA')),
+        ('GRID', (0, 0), (-1, -1), 0.4, colors.HexColor('#D0D0E0')),
+        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+        ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.HexColor('#F4F6FC')]),
+        ('TOPPADDING', (0, 0), (-1, -1), 5),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 5),
+    ]))
+    story.append(t)
+
+    # 各方案详情
+    story.append(Paragraph('三、方案详情', h1_s))
+    for i, s in enumerate(result.get('schemes', []) or [], 1):
+        story.append(Paragraph(
+            f"方案{i}：{s.get('name', '')}（预计提升 {s.get('conversion_boost', '-')}）", h2_s))
+        story.append(Paragraph(f"<b>方案特点：</b>{s.get('description', '')}", body_s))
+        story.append(Paragraph(f"<b>适合场景：</b>{s.get('suitable_for', '')}", body_s))
+        story.append(Paragraph('<b>页面结构：</b>', body_s))
+        for j, sec in enumerate(s.get('structure') or [], 1):
+            story.append(Paragraph(f'{j}. {sec}', body_s))
+        story.append(Paragraph('<b>文案示例：</b>', body_s))
+        story.append(Paragraph(
+            s.get('sample_copy', '').replace('\n', '<br/>'), body_s))
+        story.append(Spacer(1, 6))
+
+    doc.build(story)
+    buf.seek(0)
+    return buf.getvalue()
+
+
+def to_png_display(result: dict, meta: dict) -> bytes:
+    import matplotlib
+    matplotlib.use('Agg')
+    import matplotlib.pyplot as plt
+    from matplotlib.patches import FancyBboxPatch
+
+    font_name = _ensure_cjk_font()
+    if font_name:
+        plt.rcParams['font.sans-serif'] = [font_name]
+        plt.rcParams['font.family'] = 'sans-serif'
+    else:
+        plt.rcParams['font.sans-serif'] = ['DejaVu Sans']
+    plt.rcParams['axes.unicode_minus'] = False
+
+    schemes = result.get('schemes', []) or []
+    rec = result.get('recommendation', {}) or {}
+
+    fig = plt.figure(figsize=(11, 10.5), dpi=140)
+    fig.patch.set_facecolor('white')
+
+    # 标题
+    fig.text(0.04, 0.975, '凉贸通 · 商品详情页方案',
+             fontsize=20, fontweight='bold',
+             color='#4B4B8F', ha='left', va='top')
+    fig.text(0.04, 0.947,
+             '　|　'.join(f'{k}：{v}' for k, v in meta.items()),
+             fontsize=9, color='#888888', ha='left', va='top')
+    fig.add_artist(plt.Line2D([0.04, 0.96], [0.930, 0.930],
+                              color='#667EEA', lw=2.5,
+                              transform=fig.transFigure))
+
+    # 三个方案卡片
+    n = len(schemes)
+    if n > 0:
+        card_w = 0.29
+        gap = 0.025
+        left0 = 0.04
+        top = 0.87
+        height = 0.44
+
+        for i, s in enumerate(schemes[:3]):
+            x = left0 + i * (card_w + gap)
+            ax = fig.add_axes([x, top - height, card_w, height])
+            ax.axis('off')
+            bg = FancyBboxPatch(
+                (0.01, 0.01), 0.98, 0.98,
+                boxstyle="round,pad=0.01,rounding_size=0.04",
+                linewidth=1, edgecolor='#C5CEE9', facecolor='#F4F6FC',
+                transform=ax.transAxes, clip_on=False,
+            )
+            ax.add_patch(bg)
+            ax.text(0.06, 0.95, f'方案{i + 1}', fontsize=10,
+                    color='#888888', va='top', transform=ax.transAxes)
+            ax.text(0.06, 0.86, str(s.get('name', '')), fontsize=13,
+                    fontweight='bold', color='#4B4B8F', va='top',
+                    transform=ax.transAxes)
+            ax.text(0.06, 0.76, f"提升 {s.get('conversion_boost', '')}",
+                    fontsize=10, color='#28A745', va='top',
+                    transform=ax.transAxes)
+
+            desc = str(s.get('description', ''))
+            wrapped = '\n'.join(textwrap.wrap(desc, width=18))[:200]
+            ax.text(0.06, 0.66, wrapped, fontsize=9, color='#333333',
+                    va='top', linespacing=1.6, transform=ax.transAxes)
+
+            struct_txt = '\n'.join(
+                f"{j + 1}. {x}" for j, x in enumerate((s.get('structure') or [])[:6])
+            )
+            ax.text(0.06, 0.36, struct_txt, fontsize=8.5, color='#555555',
+                    va='top', linespacing=1.7, transform=ax.transAxes)
+
+    # 推荐方案
+    ax4 = fig.add_axes([0.04, 0.05, 0.92, 0.34])
+    ax4.axis('off')
+    bg = FancyBboxPatch(
+        (0.005, 0.02), 0.99, 0.96,
+        boxstyle="round,pad=0.005,rounding_size=0.03",
+        linewidth=1, edgecolor='#A8D5A8', facecolor='#EAF7EA',
+        transform=ax4.transAxes, clip_on=False,
+    )
+    ax4.add_patch(bg)
+    ax4.text(0.025, 0.90, '💡 智能推荐', fontsize=13, fontweight='bold',
+             color='#2F7A2F', va='top', transform=ax4.transAxes)
+    ax4.text(0.025, 0.76, f"推荐方案：{rec.get('scheme', '')}",
+             fontsize=11, fontweight='bold', color='#333333',
+             va='top', transform=ax4.transAxes)
+    reason = (rec.get('reason', '') or '').strip()
+    wrapped = '\n'.join(textwrap.wrap(reason, width=52)) or '（无）'
+    ax4.text(0.025, 0.60, wrapped, fontsize=10.5, va='top',
+             linespacing=1.85, color='#333333', transform=ax4.transAxes)
+
+    buf = io.BytesIO()
+    fig.savefig(buf, format='png', facecolor='white',
+                bbox_inches='tight', pad_inches=0.15)
+    plt.close(fig)
+    buf.seek(0)
+    return buf.getvalue()
+
+
+def export_display_report(result: dict, meta: dict, fmt: str = 'Excel',
+                          name_hint: str = ''):
+    """智能展示报告导出统一入口，返回 (bytes, 文件名, MIME)"""
+    base = (f"详情页方案_{safe_filename(name_hint)}_"
+            f"{_now_cn():%Y%m%d}")
+
+    if fmt == 'Excel':
+        data = to_excel_display(result, meta)
+    elif fmt == 'Word':
+        data = to_word_display(result, meta)
+    elif fmt == 'PDF':
+        data = to_pdf_display(result, meta)
+    elif fmt == '图片':
+        data = to_png_display(result, meta)
+    else:
+        raise ValueError(f'不支持的导出格式：{fmt}')
+
+    return data, base + EXT[fmt], MIME[fmt]
