@@ -14,7 +14,7 @@ import plotly.express as px
 import json
 import os
 from datetime import datetime
-from exporter import export_selection_report
+from exporter import export_selection_report, export_display_report
 
 # 导入智能体模块
 from agents.selection_agent import SelectionAgent
@@ -708,18 +708,18 @@ def display_page():
     """商品智能展示页面"""
     st.markdown("## 🎨 商品智能展示智能体")
     st.write("自动生成专业的商品详情页方案，智能优化排版，帮助您提升转化率")
-    
-    # 输入区域
+
+    # ---------- 输入区域 ----------
     st.markdown("### 📝 产品信息")
-    
+
     col1, col2 = st.columns(2)
-    
+
     with col1:
         product_name = st.text_input("产品名称", value="家用小型制冰机")
         product_type = st.selectbox("产品类型", ["功能型", "家居型", "科技型", "时尚型"])
         target_platform = st.selectbox("目标平台", ["亚马逊", "速卖通", "独立站"])
         target_language = st.selectbox("目标语言", ["英语", "德语", "法语", "意大利语"])
-    
+
     with col2:
         st.markdown("产品图片（模拟上传）")
         st.info("📷 演示版本：模拟已上传5张产品图片")
@@ -730,8 +730,7 @@ def display_page():
         - 参数图：规格参数说明
         - 包装图：包装展示
         """)
-    
-    # 核心卖点
+
     core_selling_points = st.text_area(
         "核心卖点",
         value="""快速制冰，6分钟出冰
@@ -740,11 +739,10 @@ def display_page():
 自清洁功能，使用省心
 小巧便携，不占空间"""
     )
-    
-    # 生成按钮
+
+    # ---------- 生成 ----------
     if st.button("🎨 生成详情页方案", type="primary", use_container_width=True):
         with st.spinner("智能体正在生成详情页方案..."):
-            # 调用展示智能体
             agents = init_agents()
             result = agents['display'].generate(
                 product_name=product_name,
@@ -753,50 +751,99 @@ def display_page():
                 target_language=target_language,
                 core_selling_points=core_selling_points.split('\n')
             )
-        
-        # 展示结果
-        st.success("✅ 详情页方案生成完成！")
-        
-        # 三套方案
-        st.markdown("### 📄 三套详情页方案")
-        
-        for i, scheme in enumerate(result['schemes'], 1):
-            with st.expander(f"方案{i}：{scheme['name']} - 预计转化率提升：{scheme['conversion_boost']}", expanded=(i==1)):
-                col1, col2 = st.columns([1, 2])
-                
-                with col1:
-                    st.markdown(f"**方案特点：**")
-                    st.write(scheme['description'])
-                    st.markdown(f"**适合场景：**")
-                    st.write(scheme['suitable_for'])
-                
-                with col2:
-                    st.markdown("**页面结构：**")
-                    for j, section in enumerate(scheme['structure'], 1):
-                        st.write(f"{j}. {section}")
-                
-                st.markdown("**文案示例：**")
-                st.info(scheme['sample_copy'])
-        
-        # 方案对比
-        st.markdown("### 📊 方案对比")
-        
-        comparison_df = pd.DataFrame([
-            {"方案": "方案A", "风格": result['schemes'][0]['name'], "预计转化率提升": result['schemes'][0]['conversion_boost'], "制作难度": "简单"},
-            {"方案": "方案B", "风格": result['schemes'][1]['name'], "预计转化率提升": result['schemes'][1]['conversion_boost'], "制作难度": "中等"},
-            {"方案": "方案C", "风格": result['schemes'][2]['name'], "预计转化率提升": result['schemes'][2]['conversion_boost'], "制作难度": "较难"},
-        ])
-        
-        st.table(comparison_df)
-        
-        # 推荐方案
-        st.markdown("### 💡 智能推荐")
-        st.markdown(f"""
-        <div class="success-box">
-        <strong>推荐方案：{result['recommendation']['scheme']}</strong><br><br>
-        {result['recommendation']['reason']}
-        </div>
-        """, unsafe_allow_html=True)
+
+        # 缓存
+        st.session_state['disp_result'] = result
+        st.session_state['disp_meta'] = {
+            '产品名称': product_name,
+            '产品类型': product_type,
+            '目标平台': target_platform,
+            '目标语言': target_language,
+            '生成时间': now_cn().strftime('%Y-%m-%d %H:%M'),
+        }
+        st.session_state['disp_hint'] = product_name
+
+    # ---------- 结果展示 ----------
+    result = st.session_state.get('disp_result')
+    if not result:
+        return
+
+    meta = st.session_state.get('disp_meta', {})
+    name_hint = st.session_state.get('disp_hint', '')
+
+    st.success("✅ 详情页方案生成完成！")
+
+    # 三套方案
+    st.markdown("### 📄 三套详情页方案")
+    for i, scheme in enumerate(result['schemes'], 1):
+        with st.expander(
+            f"方案{i}：{scheme['name']} - 预计转化率提升：{scheme['conversion_boost']}",
+            expanded=(i == 1)
+        ):
+            c1, c2 = st.columns([1, 2])
+            with c1:
+                st.markdown("**方案特点：**")
+                st.write(scheme['description'])
+                st.markdown("**适合场景：**")
+                st.write(scheme['suitable_for'])
+            with c2:
+                st.markdown("**页面结构：**")
+                for j, section in enumerate(scheme['structure'], 1):
+                    st.write(f"{j}. {section}")
+            st.markdown("**文案示例：**")
+            st.info(scheme['sample_copy'])
+
+    # 方案对比
+    st.markdown("### 📊 方案对比")
+    comparison_df = pd.DataFrame([
+        {"方案": f"方案{i}", "风格": s['name'],
+         "预计转化率提升": s['conversion_boost']}
+        for i, s in enumerate(result['schemes'], 1)
+    ])
+    st.table(comparison_df)
+
+    # 推荐方案
+    st.markdown("### 💡 智能推荐")
+    st.markdown(f"""
+    <div class="success-box">
+    <strong>推荐方案：{result['recommendation']['scheme']}</strong><br><br>
+    {result['recommendation']['reason']}
+    </div>
+    """, unsafe_allow_html=True)
+
+    # ---------- 导出报告 ----------
+    st.markdown("---")
+    st.markdown("### 📥 导出方案报告")
+
+    fmt = st.radio(
+        "选择导出格式",
+        ["Excel", "Word", "PDF", "图片"],
+        horizontal=True,
+        key="disp_export_fmt",
+        help="Excel：二次编辑 / Word：正式报告 / PDF：打印 / 图片：微信分享"
+    )
+
+    with st.spinner("正在生成报告文件..."):
+        data, filename, mime = export_display_report(
+            result, meta, fmt=fmt, name_hint=name_hint
+        )
+
+    if fmt == "图片":
+        st.image(data, caption="详情页方案预览", use_container_width=True)
+
+    col_a, col_b = st.columns([1, 1])
+    with col_a:
+        st.download_button(
+            f"📥 下载 {fmt} 报告",
+            data=data,
+            file_name=filename,
+            mime=mime,
+            type="primary",
+            use_container_width=True
+        )
+    with col_b:
+        st.caption(f"文件名：{filename}")
+        st.caption(f"大小：{len(data) / 1024:.1f} KB")
 
 # ==================== 主函数 ====================
 def main():
