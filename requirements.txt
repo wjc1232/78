@@ -1,6 +1,6 @@
 # 凉贸通 - 依赖包列表
 # 安装命令：pip install -r requirements.txt
-
+pip install openpyxl python-docx reportlab matplotlib
 # Web框架
 streamlit>=1.28.0
 
