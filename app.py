@@ -593,39 +593,42 @@ def compliance_page():
         product_category, has_battery
     )
 
-    certifications = {}
+        certifications = {}
+
+    # ---------- 快捷按钮放在 checkbox 之前 ----------
     if cert_options:
-        # 每行 3 个 checkbox
+        qc1, qc2, _ = st.columns([1, 1, 3])
+        with qc1:
+            if st.button("✅ 一键全选", use_container_width=True, key="cert_btn_all"):
+                for opt in cert_options:
+                    st.session_state[f"cert_{opt['key']}"] = True
+                st.rerun()
+        with qc2:
+            if st.button("🧹 一键清空", use_container_width=True, key="cert_btn_none"):
+                for opt in cert_options:
+                    st.session_state[f"cert_{opt['key']}"] = False
+                st.rerun()
+
+    # ---------- checkbox 渲染 ----------
+    if cert_options:
         cert_cols = st.columns(3)
         for i, opt in enumerate(cert_options):
             with cert_cols[i % 3]:
+                # 第一次渲染时，如果没有这个 key，先初始化
+                key = f"cert_{opt['key']}"
+                if key not in st.session_state:
+                    st.session_state[key] = False
+
                 label = opt['name']
-                if opt['required']:
-                    label += "（强制）"
-                else:
-                    label += "（建议）"
+                label += "（强制）" if opt['required'] else "（建议）"
+
                 certifications[opt['key']] = st.checkbox(
                     label,
-                    value=False,
-                    key=f"cert_{opt['key']}",
+                    key=key,
                     help=opt['description'],
                 )
     else:
         st.info("当前产品类别下没有适用的认证项。")
-
-    # 快捷按钮：一键全选 / 一键清空
-    qc1, qc2, _ = st.columns([1, 1, 3])
-    with qc1:
-        if st.button("✅ 一键全选", use_container_width=True):
-            for opt in cert_options:
-                st.session_state[f"cert_{opt['key']}"] = True
-            st.rerun()
-    with qc2:
-        if st.button("🧹 一键清空", use_container_width=True):
-            for opt in cert_options:
-                st.session_state[f"cert_{opt['key']}"] = False
-            st.rerun()
-
     # ---------- 校验按钮 ----------
     if st.button("🔍 开始合规校验", type="primary", use_container_width=True):
         with st.spinner("智能体正在进行合规校验..."):
