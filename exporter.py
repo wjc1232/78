@@ -9,11 +9,13 @@ import io
 import re
 import textwrap
 from datetime import datetime
-
+from zoneinfo import ZoneInfo
 import pandas as pd
 
 EUR_TO_CNY = 7.5
-
+def _now_cn():
+    """返回北京时间（UTC+8）"""
+    return datetime.now(ZoneInfo("Asia/Shanghai"))
 
 # ==================== 公共工具 ====================
 
@@ -329,7 +331,7 @@ def to_word(result: dict, meta: dict) -> bytes:
     # 页脚
     fp = doc.add_paragraph()
     fp.alignment = WD_ALIGN_PARAGRAPH.CENTER
-    style_run(fp.add_run(f"凉贸通 © 2026　|　生成时间：{datetime.now():%Y-%m-%d %H:%M}"),
+    style_run(fp.add_run(f"凉贸通 © 2026　|　生成时间：{now_cn():%Y-%m-%d %H:%M}"),
               size=8, color=(0xAA, 0xAA, 0xAA))
 
     buf = io.BytesIO()
