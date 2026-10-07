@@ -489,36 +489,29 @@ def to_png(result: dict, meta: dict) -> bytes:
     import matplotlib
     matplotlib.use('Agg')
     import matplotlib.pyplot as plt
-    from matplotlib.patches import FancyBboxPatch
 
-    font_name = _ensure_cjk_font()
-    if font_name:
-        plt.rcParams['font.sans-serif'] = [font_name]
+    font = _find_cjk_font()
+    if font:
+        plt.rcParams['font.sans-serif'] = [font]
         plt.rcParams['font.family'] = 'sans-serif'
-    else:
-        plt.rcParams['font.sans-serif'] = ['DejaVu Sans']
     plt.rcParams['axes.unicode_minus'] = False
 
     products = result.get('products', []) or []
     trend = result.get('trend_data', []) or []
 
-    # 图更矮更紧凑
-    fig = plt.figure(figsize=(11, 10.5), dpi=140)
+    fig = plt.figure(figsize=(11, 14.5), dpi=140)
     fig.patch.set_facecolor('white')
 
-    # ---- 标题区 ----
-    fig.text(0.04, 0.975, '凉贸通 · 选品分析报告',
-             fontsize=20, fontweight='bold',
+    # ---- 标题 ----
+    fig.text(0.05, 0.978, '凉贸通 · 选品分析报告', fontsize=21, fontweight='bold',
              color='#4B4B8F', ha='left', va='top')
-    fig.text(0.04, 0.947,
-             '　|　'.join(f'{k}：{v}' for k, v in meta.items()),
-             fontsize=9, color='#888888', ha='left', va='top')
-    fig.add_artist(plt.Line2D([0.04, 0.96], [0.930, 0.930],
-                              color='#667EEA', lw=2.5,
+    fig.text(0.05, 0.947, '　|　'.join(f'{k}：{v}' for k, v in meta.items()),
+             fontsize=9.5, color='#888888', ha='left', va='top')
+    fig.add_artist(plt.Line2D([0.05, 0.95], [0.933, 0.933], color='#667EEA', lw=2.5,
                               transform=fig.transFigure))
 
     # ---- 左：评分条形图 ----
-    ax1 = fig.add_axes([0.05, 0.680, 0.42, 0.235])
+    ax1 = fig.add_axes([0.06, 0.675, 0.40, 0.235])
     if products:
         names = [p.get('name', '') for p in products][::-1]
         scores = [p.get('score', 0) for p in products][::-1]
@@ -532,11 +525,10 @@ def to_png(result: dict, meta: dict) -> bytes:
             ax1.spines[sp].set_visible(False)
         ax1.grid(axis='x', linestyle='--', alpha=0.3)
         ax1.set_axisbelow(True)
-    ax1.set_title('产品综合评分', fontsize=12, fontweight='bold',
-                  color='#333333', pad=6)
+    ax1.set_title('产品综合评分', fontsize=12, fontweight='bold', color='#333333', pad=10)
 
-    # ---- 右：销量趋势 ----
-    ax2 = fig.add_axes([0.55, 0.680, 0.42, 0.235])
+    # ---- 右：趋势折线图 ----
+    ax2 = fig.add_axes([0.56, 0.675, 0.39, 0.235])
     if trend:
         xs = [str(d.get('月份', '')) for d in trend]
         ys = [d.get('销量', 0) for d in trend]
@@ -549,11 +541,10 @@ def to_png(result: dict, meta: dict) -> bytes:
         ax2.set_axisbelow(True)
         for sp in ['top', 'right']:
             ax2.spines[sp].set_visible(False)
-    ax2.set_title('目标市场销量趋势', fontsize=12, fontweight='bold',
-                  color='#333333', pad=6)
+    ax2.set_title('目标市场销量趋势', fontsize=12, fontweight='bold', color='#333333', pad=10)
 
-    # ---- 中间：表格 ----
-    ax3 = fig.add_axes([0.02, 0.315, 0.96, 0.31])
+    # ---- 产品表格 ----
+    ax3 = fig.add_axes([0.03, 0.30, 0.94, 0.34])
     ax3.axis('off')
     if products:
         cols = ['排名', '产品名称', '评分', '成本(元)', '售价(€)', '利润率', '月销量']
@@ -565,49 +556,39 @@ def to_png(result: dict, meta: dict) -> bytes:
                 f'{profit_rate(p):.1f}%', str(p.get('sales_prediction', '')),
             ])
         tbl = ax3.table(cellText=cell_text, colLabels=cols,
-                        loc='upper center', cellLoc='center',
+                        loc='center', cellLoc='center',
                         colWidths=[0.09, 0.30, 0.09, 0.13, 0.12, 0.11, 0.16])
         tbl.auto_set_font_size(False)
         tbl.set_fontsize(9.5)
-        # 产品少时行高更大，避免顶部空；产品多时压缩
-        row_scale = 2.2 if len(products) <= 4 else (1.8 if len(products) <= 6 else 1.4)
-        tbl.scale(1, row_scale)
+        tbl.scale(1, 2.0)
         for j in range(len(cols)):
             tbl[0, j].set_facecolor('#667EEA')
             tbl[0, j].set_text_props(color='white', fontweight='bold')
-            tbl[0, j].set_height(0.11)
         for i in range(1, len(cell_text) + 1):
             for j in range(len(cols)):
                 if i % 2 == 0:
                     tbl[i, j].set_facecolor('#F2F4FB')
                 tbl[i, j].set_edgecolor('#D8DCEA')
-        ax3.text(0.5, 1.03, '推荐产品一览', fontsize=12, fontweight='bold',
-                 color='#333333', ha='center', va='bottom',
-                 transform=ax3.transAxes)
+    ax3.set_title('推荐产品一览', fontsize=12, fontweight='bold',
+                  color='#333333', pad=18)
 
-    # ---- 底部：选品建议（带背景框，视觉更饱满）----
-    ax4 = fig.add_axes([0.04, 0.045, 0.92, 0.21])
+    # ---- 选品建议 ----
+    ax4 = fig.add_axes([0.05, 0.03, 0.90, 0.24])
     ax4.axis('off')
-    bg = FancyBboxPatch(
-        (0.005, 0.02), 0.99, 0.96,
-        boxstyle="round,pad=0.005,rounding_size=0.03",
-        linewidth=1, edgecolor='#C5CEE9', facecolor='#F4F6FC',
-        transform=ax4.transAxes, clip_on=False,
-    )
-    ax4.add_patch(bg)
-    ax4.text(0.025, 0.90, '💡 选品建议', fontsize=13, fontweight='bold',
-             color='#4B4B8F', va='top', transform=ax4.transAxes)
-    sugg = (result.get('suggestion', '') or '（无）').strip()
-    wrapped = '\n'.join(textwrap.wrap(sugg, width=55)) or '（无）'
-    ax4.text(0.025, 0.70, wrapped, fontsize=11, va='top',
-             linespacing=1.9, color='#333333', transform=ax4.transAxes)
+    ax4.text(0, 1.0, '选品建议', fontsize=12, fontweight='bold',
+             color='#4B4B8F', va='top')
+    sugg = result.get('suggestion', '') or ''
+    wrapped = '\n'.join(textwrap.wrap(sugg, width=58)) or '（无）'
+    ax4.text(0, 0.80, wrapped, fontsize=10.5, va='top',
+             linespacing=1.9, color='#333333')
 
     buf = io.BytesIO()
-    fig.savefig(buf, format='png', facecolor='white',
-                bbox_inches='tight', pad_inches=0.15)
+    fig.savefig(buf, format='png', facecolor='white', bbox_inches='tight')
     plt.close(fig)
     buf.seek(0)
     return buf.getvalue()
+
+
 
 
 # ==================== 统一入口 ====================
