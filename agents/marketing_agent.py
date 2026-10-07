@@ -221,13 +221,141 @@ Caractéristiques Clés :
 Ne laissez pas la chaleur vous ralentir. Procurez-vous votre {product_name} dès aujourd'hui et restez au frais tout l'été !
 
 Prix : €{price:.2f}"""
-        
+
+                    elif language == "意大利语":
+            title = f"{product_name} - Ventilatore Potente con Funzionamento Silenzioso, Energeticamente Efficiente, Perfetto per Casa e Ufficio"
+            bullets = [
+                f"【Raffreddamento Potente】{core_features[0] if len(core_features) > 0 else 'Flusso d\'aria potente per un raffreddamento istantaneo'}",
+                f"【Ultra Silenzioso】{core_features[1] if len(core_features) > 1 else 'Tecnologia di riduzione del rumore per un ambiente tranquillo'}",
+                f"【Risparmio Energetico】{core_features[2] if len(core_features) > 2 else 'Basso consumo energetico che riduce la bolletta'}",
+                f"【Design Portatile】{core_features[3] if len(core_features) > 3 else 'Leggero e facile da spostare ovunque'}",
+                f"【Garanzia di Qualità】{core_features[4] if len(core_features) > 4 else 'Materiali di alta qualità per una lunga durata'}",
+            ]
+            description = f"""Scopri il massimo comfort con il nostro {product_name} premium!
+
+Perfetto per le calde giornate estive, questo ventilatore offre un flusso d'aria potente mantenendo un funzionamento silenzioso. Che tu stia lavorando, dormendo o rilassandoti, crea l'ambiente confortevole ideale per te.
+
+Caratteristiche Principali:
+• {core_features[0] if len(core_features) > 0 else 'Flusso d\'aria potente'}
+• {core_features[1] if len(core_features) > 1 else 'Funzionamento ultra silenzioso'}
+• {core_features[2] if len(core_features) > 2 else 'Design a risparmio energetico'}
+• {core_features[3] if len(core_features) > 3 else 'Portatile e leggero'}
+• {core_features[4] if len(core_features) > 4 else 'Costruzione di alta qualità'}
+
+Non lasciare che il caldo ti rallenti. Acquista oggi il tuo {product_name} e rimani fresco tutta l'estate!
+
+Prezzo: €{price:.2f}"""
+
+        elif language == "西班牙语":
+            title = f"{product_name} - Ventilador Potente con Funcionamiento Silencioso, Eficiente Energéticamente, Perfecto para Hogar y Oficina"
+            bullets = [
+                f"【Enfriamiento Potente】{core_features[0] if len(core_features) > 0 else 'Flujo de aire potente para un enfriamiento instantáneo'}",
+                f"【Ultra Silencioso】{core_features[1] if len(core_features) > 1 else 'Tecnología de reducción de ruido para un ambiente tranquilo'}",
+                f"【Ahorro de Energía】{core_features[2] if len(core_features) > 2 else 'Bajo consumo eléctrico que reduce tu factura'}",
+                f"【Diseño Portátil】{core_features[3] if len(core_features) > 3 else 'Ligero y fácil de mover a cualquier lugar'}",
+                f"【Garantía de Calidad】{core_features[4] if len(core_features) > 4 else 'Materiales de alta calidad para una larga vida útil'}",
+            ]
+            description = f"""¡Experimenta el máximo confort de enfriamiento con nuestro {product_name} premium!
+
+Perfecto para los calurosos días de verano, este ventilador ofrece un potente flujo de aire manteniendo un funcionamiento ultrasilencioso. Ya sea que estés trabajando, durmiendo o relajándote, crea el ambiente perfecto para ti.
+
+Características Principales:
+• {core_features[0] if len(core_features) > 0 else 'Flujo de aire potente'}
+• {core_features[1] if len(core_features) > 1 else 'Funcionamiento ultrasilencioso'}
+• {core_features[2] if len(core_features) > 2 else 'Diseño de bajo consumo'}
+• {core_features[3] if len(core_features) > 3 else 'Portátil y ligero'}
+• {core_features[4] if len(core_features) > 4 else 'Construcción de alta calidad'}
+
+¡No dejes que el calor te detenga. Consigue tu {product_name} hoy y mantente fresco todo el verano!
+
+Precio: €{price:.2f}"""
+
+        elif language == "荷兰语":
+            title = f"{product_name} - Krachtige Ventilator met Stille Werking, Energiezuinig, Perfect voor Thuis en Kantoor"
+            bullets = [
+                f"【Krachtige Koeling】{core_features[0] if len(core_features) > 0 else 'Krachtige luchtstroom voor directe verkoeling'}",
+                f"【Ultra Stil】{core_features[1] if len(core_features) > 1 else 'Geluidreductietechnologie voor een rustige omgeving'}",
+                f"【Energiebesparend】{core_features[2] if len(core_features) > 2 else 'Laag stroomverbruik verlaagt uw energierekening'}",
+                f"【Draagbaar Ontwerp】{core_features[3] if len(core_features) > 3 else 'Licht en gemakkelijk overal mee naartoe te nemen'}",
+                f"【Kwaliteitsgarantie】{core_features[4] if len(core_features) > 4 else 'Hoogwaardige materialen voor een lange levensduur'}",
+            ]
+            description = f"""Ervaar ultiem koelcomfort met onze premium {product_name}!
+
+Perfect voor hete zomerdagen levert deze ventilator een krachtige luchtstroom terwijl hij fluisterstil werkt. Of u nu werkt, slaapt of ontspant, hij creëert de perfecte comfortabele omgeving voor u.
+
+Belangrijkste Kenmerken:
+• {core_features[0] if len(core_features) > 0 else 'Krachtige luchtstroom'}
+• {core_features[1] if len(core_features) > 1 else 'Ultra stille werking'}
+• {core_features[2] if len(core_features) > 2 else 'Energiezuinig ontwerp'}
+• {core_features[3] if len(core_features) > 3 else 'Draagbaar en licht'}
+• {core_features[4] if len(core_features) > 4 else 'Hoogwaardige constructie'}
+
+Laat de hitte u niet vertragen. Haal vandaag nog uw {product_name} en blijf de hele zomer koel!
+
+Prijs: €{price:.2f}"""
+
+        elif language == "波兰语":
+            title = f"{product_name} - Mocny Wentylator z Cichą Pracą, Energooszczędny, Idealny do Domu i Biura"
+            bullets = [
+                f"【Mocne Chłodzenie】{core_features[0] if len(core_features) > 0 else 'Mocny przepływ powietrza dla natychmiastowego chłodzenia'}",
+                f"【Ultra Cichy】{core_features[1] if len(core_features) > 1 else 'Technologia redukcji hałasu dla spokojnego otoczenia'}",
+                f"【Oszczędność Energii】{core_features[2] if len(core_features) > 2 else 'Niskie zużycie energii obniża rachunki za prąd'}",
+                f"【Przenośny Design】{core_features[3] if len(core_features) > 3 else 'Lekki i łatwy do przenoszenia wszędzie'}",
+                f"【Gwarancja Jakości】{core_features[4] if len(core_features) > 4 else 'Materiały wysokiej jakości zapewniają długą żywotność'}",
+            ]
+            description = f"""Odkryj najwyższy komfort chłodzenia z naszym premium {product_name}!
+
+Idealny na gorące letnie dni, ten wentylator zapewnia mocny przepływ powietrza, zachowując cichą pracę. Niezależnie od tego, czy pracujesz, śpisz czy odpoczywasz, tworzy idealne komfortowe środowisko dla Ciebie.
+
+Kluczowe Cechy:
+• {core_features[0] if len(core_features) > 0 else 'Mocny przepływ powietrza'}
+• {core_features[1] if len(core_features) > 1 else 'Ultra cicha praca'}
+• {core_features[2] if len(core_features) > 2 else 'Energooszczędny design'}
+• {core_features[3] if len(core_features) > 3 else 'Przenośny i lekki'}
+• {core_features[4] if len(core_features) > 4 else 'Wysokiej jakości wykonanie'}
+
+Nie pozwól, aby upał Cię spowolnił. Kup swój {product_name} już dziś i pozostań chłodny przez całe lato!
+
+Cena: €{price:.2f}"""
+
+        elif language == "瑞典语":
+            title = f"{product_name} - Kraftfull Fläkt med Tyst Drift, Energieffektiv, Perfekt för Hem och Kontor"
+            bullets = [
+                f"【Kraftfull Kylning】{core_features[0] if len(core_features) > 0 else 'Kraftfullt luftflöde för omedelbar kylning'}",
+                f"【Ultra Tyst】{core_features[1] if len(core_features) > 1 else 'Bullerreduktionsteknik för en lugn miljö'}",
+                f"【Energieffektiv】{core_features[2] if len(core_features) > 2 else 'Låg energiförbrukning sänker din elräkning'}",
+                f"【Bärbar Design】{core_features[3] if len(core_features) > 3 else 'Lätt och enkel att flytta överallt'}",
+                f"【Kvalitetsgaranti】{core_features[4] if len(core_features) > 4 else 'Högkvalitativa material säkerställer lång livslängd'}",
+            ]
+            description = f"""Upplev ultimat kylkomfort med vår premium {product_name}!
+
+Perfekt för varma sommardagar levererar denna fläkt ett kraftfullt luftflöde samtidigt som den är knäpptyst. Oavsett om du arbetar, sover eller kopplar av skapar den den perfekta bekväma miljön för dig.
+
+Viktiga Egenskaper:
+• {core_features[0] if len(core_features) > 0 else 'Kraftfullt luftflöde'}
+• {core_features[1] if len(core_features) > 1 else 'Ultra tyst drift'}
+• {core_features[2] if len(core_features) > 2 else 'Energieffektiv design'}
+• {core_features[3] if len(core_features) > 3 else 'Bärbar och lätt'}
+• {core_features[4] if len(core_features) > 4 else 'Högkvalitativ konstruktion'}
+
+Låt inte värmen sakta ner dig. Skaffa din {product_name} idag och håll dig sval hela sommaren!
+
+Pris: €{price:.2f}"""
+
+
+                           
         else:
-            # 其他语言使用英语作为基础（演示版本）
-            title = f"{product_name} - Premium Quality Cooling Product for Summer Comfort"
-            bullets = [f"Feature {i+1}: {feat}" for i, feat in enumerate(core_features[:5])]
-            description = f"High quality {product_name} at €{price:.2f}.\n\nFeatures:\n" + "\n".join([f"- {f}" for f in core_features])
-        
+            # 未实现的语言：明确标记，而不是用英文冒充
+            title = f"[{language}] 暂未提供地道文案，请选择英语/德语/法语/意大利语/西班牙语/荷兰语/波兰语/瑞典语"
+            bullets = [
+                f"[{language}] 该语言模板尚未实现",
+                "请在 marketing_agent.py 中补充对应语言的 elif 分支",
+            ]
+            description = (
+                f"[{language}] 当前版本尚未提供 {language} 的正式文案模板。\n"
+                f"产品：{product_name}\n售价：€{price:.2f}\n"
+                f"卖点：{'; '.join(core_features) if core_features else '（无）'}"
+            )
         return {
             "language": language,
             "title": title,
