@@ -490,7 +490,7 @@ def to_png(result: dict, meta: dict) -> bytes:
     matplotlib.use('Agg')
     import matplotlib.pyplot as plt
 
-    font = _find_cjk_font()
+    font = _ensure_cjk_font()
     if font:
         plt.rcParams['font.sans-serif'] = [font]
         plt.rcParams['font.family'] = 'sans-serif'
