@@ -13,6 +13,7 @@ import plotly.express as px
 import json
 import os
 from datetime import datetime
+from exporter import export_selection_report
 
 # 导入智能体模块
 from agents.selection_agent import SelectionAgent
@@ -230,45 +231,39 @@ def selection_page():
     """选品分析页面"""
     st.markdown("## 📊 选品分析智能体")
     st.write("基于欧洲市场数据和义乌产业带数据，为您推荐最具潜力的降温产品")
-    
-    # 输入区域
+
+    # ---------- 输入区域 ----------
     st.markdown("### 🔍 选品条件")
-    
     col1, col2, col3 = st.columns(3)
-    
+
     with col1:
         target_country = st.selectbox(
             "目标国家",
             ["德国", "法国", "意大利", "西班牙", "英国", "荷兰", "波兰", "瑞典"],
             index=0
         )
-    
     with col2:
         category = st.selectbox(
             "产品品类",
             ["全部", "风扇类", "制冰机类", "冷感家纺类", "冰垫类", "便携制冷类"],
             index=0
         )
-    
     with col3:
         budget = st.slider(
             "采购预算范围（元）",
-            min_value=1000,
-            max_value=100000,
-            value=(5000, 50000),
-            step=1000
+            min_value=1000, max_value=100000,
+            value=(5000, 50000), step=1000
         )
-    
+
     risk_preference = st.select_slider(
         "风险偏好",
         options=["保守", "稳健", "积极", "激进"],
         value="稳健"
     )
-    
-    # 分析按钮
+
+    # ---------- 触发分析 ----------
     if st.button("🚀 开始选品分析", type="primary", use_container_width=True):
         with st.spinner("智能体正在分析市场数据..."):
-            # 调用选品智能体
             agents = init_agents()
             result = agents['selection'].analyze(
                 target_country=target_country,
@@ -276,58 +271,104 @@ def selection_page():
                 budget=budget,
                 risk_preference=risk_preference
             )
-        
-        # 展示结果
-        st.success("✅ 选品分析完成！")
-        
-        # 推荐产品列表
-        st.markdown("### 🏆 推荐产品TOP5")
-        
-        for i, product in enumerate(result['products'], 1):
-            with st.expander(f"**TOP{i}: {product['name']}** - 综合评分: {product['score']}分", expanded=(i==1)):
-                col1, col2, col3, col4 = st.columns(4)
-                
-                with col1:
-                    st.metric("采购成本", f"¥{product['cost']}")
-                with col2:
-                    st.metric("预计售价", f"€{product['price_eu']}")
-                with col3:
-                    profit_rate = ((product['price_eu'] * 7.5 - product['cost']) / (product['price_eu'] * 7.5)) * 100
-                    st.metric("利润率", f"{profit_rate:.1f}%")
-                with col4:
-                    st.metric("月销量预测", f"{product['sales_prediction']}件")
-                
-                st.markdown("**产品卖点：**")
-                for selling_point in product['selling_points']:
-                    st.write(f"- {selling_point}")
-                
-                st.markdown("**风险提示：**")
-                for risk in product['risks']:
-                    st.warning(f"⚠️ {risk}")
-        
-        # 趋势图表
-        st.markdown("### 📈 市场趋势分析")
-        trend_data = pd.DataFrame(result['trend_data'])
-        fig = px.line(trend_data, x='月份', y='销量', title='目标市场降温产品销量趋势')
-        st.plotly_chart(fig, use_container_width=True)
-        
-        # 选品建议
-        st.markdown("### 💡 选品建议")
-        st.markdown(f"""
-        <div class="result-box">
-        <strong>针对{target_country}市场的选品建议：</strong><br><br>
-        {result['suggestion']}
-        </div>
-        """, unsafe_allow_html=True)
-        
-        # 导出报告
-        st.download_button(
-            "📥 导出选品分析报告",
-            data=json.dumps(result, ensure_ascii=False, indent=2),
-            file_name=f"选品分析报告_{target_country}_{datetime.now().strftime('%Y%m%d')}.json",
-            mime="application/json"
+        # 缓存到 session_state，避免页面 rerun 后结果丢失
+        st.session_state['sel_result'] = result
+        st.session_state['sel_meta'] = {
+            '目标国家': target_country,
+            '产品品类': category,
+            '采购预算(元)': f"{budget[0]:,} - {budget[1]:,}",
+            '风险偏好': risk_preference,
+            '生成时间': datetime.now().strftime('%Y-%m-%d %H:%M'),
+        }
+        st.session_state['sel_country'] = target_country
+
+    # ---------- 结果展示 ----------
+    result = st.session_state.get('sel_result')
+    if not result:
+        return
+
+    meta = st.session_state.get('sel_meta', {})
+    country_hint = st.session_state.get('sel_country', '')
+
+    st.success("✅ 选品分析完成！")
+
+    # 推荐产品
+    st.markdown("### 🏆 推荐产品TOP5")
+    for i, product in enumerate(result['products'], 1):
+        with st.expander(
+            f"**TOP{i}: {product['name']}** - 综合评分: {product['score']}分",
+            expanded=(i == 1)
+        ):
+            c1, c2, c3, c4 = st.columns(4)
+            with c1:
+                st.metric("采购成本", f"¥{product['cost']}")
+            with c2:
+                st.metric("预计售价", f"€{product['price_eu']}")
+            with c3:
+                rate = ((product['price_eu'] * 7.5 - product['cost'])
+                        / (product['price_eu'] * 7.5)) * 100
+                st.metric("利润率", f"{rate:.1f}%")
+            with c4:
+                st.metric("月销量预测", f"{product['sales_prediction']}件")
+
+            st.markdown("**产品卖点：**")
+            for sp in product['selling_points']:
+                st.write(f"- {sp}")
+
+            st.markdown("**风险提示：**")
+            for rk in product['risks']:
+                st.warning(f"⚠️ {rk}")
+
+    # 趋势图
+    st.markdown("### 📈 市场趋势分析")
+    trend_data = pd.DataFrame(result['trend_data'])
+    fig = px.line(trend_data, x='月份', y='销量',
+                  title='目标市场降温产品销量趋势')
+    st.plotly_chart(fig, use_container_width=True)
+
+    # 选品建议
+    st.markdown("### 💡 选品建议")
+    st.markdown(f"""
+    <div class="result-box">
+    <strong>针对{country_hint}市场的选品建议：</strong><br><br>
+    {result['suggestion']}
+    </div>
+    """, unsafe_allow_html=True)
+
+    # ---------- 导出报告（4 种格式） ----------
+    st.markdown("---")
+    st.markdown("### 📥 导出分析报告")
+
+    fmt = st.radio(
+        "选择导出格式",
+        ["Excel", "Word", "PDF", "图片"],
+        horizontal=True,
+        key="sel_export_fmt",
+        help="Excel：适合二次编辑 / Word：适合正式报告 / PDF：适合打印 / 图片：适合微信分享"
+    )
+
+    with st.spinner("正在生成报告文件..."):
+        data, filename, mime = export_selection_report(
+            result, meta, fmt=fmt, name_hint=country_hint
         )
 
+    # 图片格式直接预览
+    if fmt == "图片":
+        st.image(data, caption="选品分析报告预览", use_container_width=True)
+
+    col_a, col_b = st.columns([1, 1])
+    with col_a:
+        st.download_button(
+            f"📥 下载 {fmt} 报告",
+            data=data,
+            file_name=filename,
+            mime=mime,
+            type="primary",
+            use_container_width=True
+        )
+    with col_b:
+        st.caption(f"文件名：{filename}")
+        st.caption(f"大小：{len(data) / 1024:.1f} KB")
 # ==================== 单证处理页面 ====================
 def document_page():
     """单证处理页面"""
