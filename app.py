@@ -283,7 +283,7 @@ def selection_page():
             '产品品类': category,
             '采购预算(元)': f"{budget[0]:,} - {budget[1]:,}",
             '风险偏好': risk_preference,
-            '生成时间': datetime.now().strftime('%Y-%m-%d %H:%M'),
+            '生成时间': now_cn().strftime('%Y-%m-%d %H:%M'),
         }
         st.session_state['sel_country'] = target_country
 
@@ -395,7 +395,7 @@ def document_page():
             buyer_country = st.selectbox("目的国", ["德国", "法国", "意大利", "西班牙", "英国"])
         
         with col2:
-            order_date = st.date_input("订单日期", value=datetime.now())
+            order_date = st.date_input("订单日期", value=now_cn())
             seller_name = st.text_input("卖方公司名称", value="义乌凉贸通进出口有限公司")
             trade_term = st.selectbox("贸易术语", ["FOB", "CIF", "CFR", "EXW"])
         
