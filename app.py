@@ -593,7 +593,7 @@ def compliance_page():
         product_category, has_battery
     )
 
-        certifications = {}
+    certifications = {}
 
     # ---------- 快捷按钮放在 checkbox 之前 ----------
     if cert_options:
